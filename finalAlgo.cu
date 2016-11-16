@@ -338,14 +338,15 @@ __global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d
 }
 
 
-int main()
+int main(int argc, char **argv)
 {
 	int count,i,*d_front,*d_rear,h_front,h_rear,*h_labels,*d_labels,*h_partition_begin,*d_partition_begin, *orderedGroups;
 	int *h_partition_last,*d_partition_last,*d_queue, *h_numGroups, *d_numGroups,*d_indexOrder,*d_neighbours;
 	int nx,ny,nz,x,y,z,*h_x,*h_y,*h_z,*d_x,*d_y,*d_z,*h_numPartitions,*d_numPartitions,groupLabelJockey;
 	FILE *fp, *ofp;
-
-	fp=fopen("data.txt","r");
+	char filename[100];
+	
+	fp=fopen(argv[1],"r");
 	count=0;
 	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
 	printf("%d %d %d\n",nx,ny,nz);
@@ -382,7 +383,7 @@ int main()
 	cudaMalloc(&d_neighbours,sizeof(int)*6); /*0:left, 1: behind, 2:right,3: front, 4: top, 5:bottom*/
 
 
-	fp=fopen("data.txt","r");
+	fp=fopen(argv[1],"r");
 	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
 	printf("%d %d %d\n",nx,ny,nz);
 	for(i=0;i<count;i++)
@@ -433,9 +434,8 @@ int main()
 		orderedGroups[h_labels[i]]=groupLabelJockey;
 	}
 	ofp=fopen("result.txt","w");
-	fprintf(ofp,"Nx=%d Ny=%d  Nz=%d Cluster=%d\nX Y Z id\n",nx,ny,nz,h_numGroups[0]);
 	for(i=0;i<count;i++)
-		fprintf(ofp,"%d %d %d %d\n",h_x[i],h_y[i],h_z[i],orderedGroups[h_labels[i]]);
+		fprintf(ofp,"%d\n",orderedGroups[h_labels[i]]);
 	fclose(ofp);
 
 	free(h_labels);
