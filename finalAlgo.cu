@@ -4,7 +4,7 @@
 #define hashTableWidth 12288
 #define searchKernels 1024
 #define numHashPerThread 24
-#define numThreadsPerBlock 32
+#define numThreadsPerBlock 1
 
 
 __device__ void swapTriplets(int *d_x,int *d_y,int *d_z,int *d_indexOrder, int index1,int index2)
@@ -26,7 +26,7 @@ __device__ void swapTriplets(int *d_x,int *d_y,int *d_z,int *d_indexOrder, int i
 }
 
 
-int compare(int x1,int y1, int z1, int x2, int y2, int z2)
+__device__ int compare(int x1,int y1, int z1, int x2, int y2, int z2)
 {
 	if((x1==x2) && (y1==y2) && (z1==z2))
 		return 0;
@@ -132,6 +132,7 @@ __global__ void initializePartitionTable(int *d_partition_begin, int *d_partitio
 
 __device__ int binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int hashvalue)
 {
+
 	int mid,i;
 	if(begin<=offset)
 	{
@@ -145,11 +146,7 @@ __device__ int binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,i
 			}
 			return i;
 		}
-<<<<<<< HEAD
-		else if((((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&((d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue))||(mid==offset)))
-=======
-		else if(((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&(d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue)||(mid==offset)))
->>>>>>> eae4136a3e29a41c698e91293a4ebc2b32e3c195
+		else if((((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&(((d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue))||(mid==offset)))
 		{
 			return mid;
 		}
@@ -191,11 +188,7 @@ __global__ void setIndexOrder(int *d_indexOrder, int count)
 }
 
 
-<<<<<<< HEAD
 __global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int d_numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
-=======
-__global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
->>>>>>> eae4136a3e29a41c698e91293a4ebc2b32e3c195
 {
 	int begin, last,i,j,sortPos,x,y,z,numberOfLabels, indexOrder,index, front, rear,partitionIndex;
 	
@@ -211,18 +204,18 @@ __global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d
 	for(i=begin;i<=last;i++)
 	{
 		hashvalue=(d_x[i]+d_y[i]+d_z[i])%numHashPerThread;
-		sortPos=binarySearch<<<1,1>>>(d_x,d_y, d_z,begin,i-1,hashvalue);
+		sortPos=binarySearch(d_x,d_y, d_z,begin,(i-1),hashvalue);
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
 		indexOrder=d_indexOrder[i];
 		for(j=i-1;j-numThreadsPerBlock>=sortPos;j=j-numThreadsPerBlock)
 		{
-			shiftPos<<<1,numThreadsPerBlock>>>(d_x,d_y,d_z,d_indexOrder,j);
+			shiftPos(d_x,d_y,d_z,d_indexOrder,j);
 		}
 		for(;j>=sortPos;j--)
 		{
-			shiftPos<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,j);
+			shiftPos(d_x,d_y,d_z,d_indexOrder,j);
 		}
 		d_x[sortPos]=x;
 		d_y[sortPos]=y;
@@ -362,7 +355,7 @@ int main()
 		printf("%d %d %d\n",x,y,z);
 		count++;
 	}
-	printf("%lld\n",count);
+	printf("%d\n",count);
 	fclose(fp);
 	h_x=(int*)malloc(sizeof(int)*count);
 	h_y=(int*)malloc(sizeof(int)*count);
@@ -371,6 +364,7 @@ int main()
 	h_partition_last=(int*)malloc(sizeof(int));
 	h_labels=(int*)malloc(sizeof(int)*count);
 	h_numPartitions=(int*)malloc(sizeof(int));
+	h_numGroups=(int*)malloc(sizeof(int));
 
 	cudaMalloc(&d_x,count*sizeof(int));
 	cudaMalloc(&d_y,count*sizeof(int));
@@ -439,9 +433,9 @@ int main()
 		orderedGroups[h_labels[i]]=groupLabelJockey;
 	}
 	ofp=fopen("result.txt","w");
-	fprintf(ofp,"Nx=%d Ny=%d  Nz=%d Cluster=%lld\nX Y Z id\n",nx,ny,nz,h_numGroups);
+	fprintf(ofp,"Nx=%d Ny=%d  Nz=%d Cluster=%d\nX Y Z id\n",nx,ny,nz,h_numGroups[0]);
 	for(i=0;i<count;i++)
-		fprintf(ofp,"%d %d %d %lld\n",h_x[i],h_y[i],h_z[i],orderedGroups[h_labels[i]]);
+		fprintf(ofp,"%d %d %d %d\n",h_x[i],h_y[i],h_z[i],orderedGroups[h_labels[i]]);
 	fclose(ofp);
 
 	free(h_labels);
