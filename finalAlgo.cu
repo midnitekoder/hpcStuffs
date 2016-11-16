@@ -130,9 +130,9 @@ __global__ void initializePartitionTable(int *d_partition_begin, int *d_partitio
 }
 
 
-__device__ binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int hashvalue)
+__device__ int binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int hashvalue)
 {
-	int mid;
+	int mid,i;
 	if(begin<=offset)
 	{
 		mid=(begin+offset)/2;
@@ -145,21 +145,22 @@ __device__ binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int h
 			}
 			return i;
 		}
-		else if(((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&(d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue)||(mid==offset))
+		else if((((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&((d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue))||(mid==offset)))
 		{
 			return mid;
 		}
-		else if ((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)>hashvalue)
+		else if (((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)>hashvalue)
 			return binarySearch(d_x,d_y,d_z,begin,mid-1,hashvalue);
 		else
 			return binarySearch(d_x,d_y,d_z,mid+1, offset,hashvalue);
 	}
+	return -1;
 
 
 
 }
 
-__device__ shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
+__device__ void shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
 {
 	int index=blockIdx.x*blockDim.x+threadIdx.x;
 	int x,y,z;
@@ -176,23 +177,24 @@ __device__ shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
 }
 
 
-__global__ setIndexOrder(int *d_indexOrder, int count)
+__global__ void setIndexOrder(int *d_indexOrder, int count)
 {
 	int index=blockIdx.x*blockDim.x+threadIdx.x;
+	int i;
 	for(i=index*((count+numKernels-1)/numKernels);i<(index+1)*((count+numKernels-1)/numKernels);i++)
 		if(i<count)
 			d_indexOrder[i]=i;
 }
 
 
-__global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
+__global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int d_numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
 {
-	int begin, last,i,j,sortPos,x,y,z,numberOfLabels, indexOrder,index, front, rear;
+	int begin, last,i,j,sortPos,x,y,z,numberOfLabels, indexOrder,index, front, rear,partitionIndex;
 	
-	int hashvalue,dx[6],dy[6],dz[6];
+	int hashvalue,dx[6],dy[6],dz[6],tempHashValue,k;
 
 	partitionIndex=blockIdx.x*blockDim.x+threadIdx.x;
-	if(partitionIndex>=numPartitions)
+	if(partitionIndex>=d_numPartitions)
 		return;
 	__shared__ int hashGlobalMemory[hashTableWidth];
 
@@ -205,14 +207,14 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
-		indexzOrder=d_indexOrder[i];
+		indexOrder=d_indexOrder[i];
 		for(j=i-1;j-numThreadsPerBlock>=sortPos;j=j-numThreadsPerBlock)
 		{
-			shiftPos<<<1,numThreadsPerBlock>>>(d_x,d_y,d_z,j);
+			shiftPos<<<1,numThreadsPerBlock>>>(d_x,d_y,d_z,d_indexOrder,j);
 		}
 		for(;j>=sortPos;j--)
 		{
-			shiftPos<<<1,1>>>(d_x,d_y,d_z,j);
+			shiftPos<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,j);
 		}
 		d_x[sortPos]=x;
 		d_y[sortPos]=y;
@@ -256,7 +258,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 	{
 		if(partitionIndex==0)
 		{
-			if(labels[d_indexOrder[i]]==-1)
+			if(d_labels[d_indexOrder[i]]==-1)
 			{
 				d_front[0]=0;
 				d_rear[0]=0;
@@ -304,7 +306,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 								if(d_labels[d_indexOrder[k]]==-1)
 								{
 									d_neighbours[j]=k;
-									d_labels[d_indexOrder[k]]=numGroups[0];
+									d_labels[d_indexOrder[k]]=d_numGroups[0];
 								}
 								break;
 							}
@@ -339,7 +341,7 @@ int main()
 {
 	int count,i,*d_front,*d_rear,h_front,h_rear,*h_labels,*d_labels,*h_partition_begin,*d_partition_begin, *orderedGroups;
 	int *h_partition_last,*d_partition_last,*d_queue, *h_numGroups, *d_numGroups,*d_indexOrder,*d_neighbours;
-	int nx,ny,nz,x,y,z,*h_x,*h_y,*h_z,*d_x,*d_y,*d_z,h_numPartitions,*d_numPartition;
+	int nx,ny,nz,x,y,z,*h_x,*h_y,*h_z,*d_x,*d_y,*d_z,*h_numPartitions,*d_numPartitions,groupLabelJockey;
 	FILE *fp, *ofp;
 
 	fp=fopen("data.txt","r");
@@ -360,6 +362,7 @@ int main()
 	h_partition_begin=(int*)malloc(sizeof(int));
 	h_partition_last=(int*)malloc(sizeof(int));
 	h_labels=(int*)malloc(sizeof(int)*count);
+	h_numPartitions=(int*)malloc(sizeof(int));
 
 	cudaMalloc(&d_x,count*sizeof(int));
 	cudaMalloc(&d_y,count*sizeof(int));
@@ -376,8 +379,6 @@ int main()
 	cudaMalloc(&d_indexOrder, sizeof(int)*count);
 	cudaMalloc(&d_neighbours,sizeof(int)*6); /*0:left, 1: behind, 2:right,3: front, 4: top, 5:bottom*/
 
-	h_front=-1;
-	h_rear=-1
 
 	fp=fopen("data.txt","r");
 	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
@@ -393,9 +394,9 @@ int main()
 	cudaMemcpy(d_x,h_x,count*sizeof(int),cudaMemcpyHostToDevice);
 	cudaMemcpy(d_y,h_y,count*sizeof(int),cudaMemcpyHostToDevice);
 	cudaMemcpy(d_z,h_z,count*sizeof(int),cudaMemcpyHostToDevice);
-	cudaMemcpy(d_front,h_front,sizeof(int),cudaMemcpyHostToDevice);
-	cudaMemcpy(d_rear,h_rear,sizeof(int),cudaMemcpyHostToDevice);
-	cudaMemcpy(d_rear,h_rear,sizeof(int),cudaMemcpyHostToDevice);
+	//cudaMemcpy(d_front,h_front,sizeof(int),cudaMemcpyHostToDevice);
+	//cudaMemcpy(d_rear,h_rear,sizeof(int),cudaMemcpyHostToDevice);
+	//cudaMemcpy(d_rear,h_rear,sizeof(int),cudaMemcpyHostToDevice);
 
 
 	setIndexOrder<<<numKernels,1>>>(d_indexOrder,count);
@@ -407,7 +408,7 @@ int main()
 	for(i=1;i<=(numKernels/2);i=i*2)
 	{
 
-		createPartition<<<1,i>>>(count,d_x,d_y,d_z,d_partition_begin,d_partition_last);
+		createPartition<<<1,i>>>(count,d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last);
 
 	}
 
@@ -415,12 +416,12 @@ int main()
 
 	cudaMemcpy(h_numPartitions,d_numPartitions,sizeof(int),cudaMemcpyDeviceToHost);
 
-	sortAndBFS<<<1,numKernels>>>(d_x,d_y,d_z,d_labels,d_queue,d_front,d_rear,d_partition_front,d_partition_rear,count);
+	sortAndBFS<<<1,numKernels>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,h_numPartitions[0],count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
 
 	cudaMemcpy(h_labels,d_labels,count*sizeof(int),cudaMemcpyDeviceToHost);
-	cudaMemcpy(h_numGroups,d_groups,sizeof(int),cudaMemcpyDeviceToHost);
-	orderedGroups=(int*)malloc(sizeof(int)*(h_numGroups+1));
-	for(i=1;i<=h_numGroups;i++)
+	cudaMemcpy(h_numGroups,d_numGroups,sizeof(int),cudaMemcpyDeviceToHost);
+	orderedGroups=(int*)malloc(sizeof(int)*(h_numGroups[0]+1));
+	for(i=1;i<=h_numGroups[0];i++)
 		orderedGroups[i]=-1;
 	groupLabelJockey=0;
 	for(i=0;i<count;i++)
