@@ -145,7 +145,11 @@ __device__ int binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,i
 			}
 			return i;
 		}
+<<<<<<< HEAD
 		else if((((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&((d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue))||(mid==offset)))
+=======
+		else if(((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&(d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue)||(mid==offset)))
+>>>>>>> eae4136a3e29a41c698e91293a4ebc2b32e3c195
 		{
 			return mid;
 		}
@@ -187,7 +191,11 @@ __global__ void setIndexOrder(int *d_indexOrder, int count)
 }
 
 
+<<<<<<< HEAD
 __global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int d_numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
+=======
+__global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
+>>>>>>> eae4136a3e29a41c698e91293a4ebc2b32e3c195
 {
 	int begin, last,i,j,sortPos,x,y,z,numberOfLabels, indexOrder,index, front, rear,partitionIndex;
 	
