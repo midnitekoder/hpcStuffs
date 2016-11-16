@@ -130,9 +130,9 @@ __global__ void initializePartitionTable(int *d_partition_begin, int *d_partitio
 }
 
 
-__device__ binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int hashvalue)
+__device__ int binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int hashvalue)
 {
-	int mid;
+	int mid,i;
 	if(begin<=offset)
 	{
 		mid=(begin+offset)/2;
@@ -145,21 +145,22 @@ __device__ binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,int h
 			}
 			return i;
 		}
-		else if(((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&(d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue)||(mid==offset))
+		else if(((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)<hashvalue) && (((mid<offset)&&(d_x[mid+1]+d_y[mid+1]+d_z[mid+1])%numHashPerThread)>hashvalue)||(mid==offset)))
 		{
 			return mid;
 		}
-		else if ((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)>hashvalue)
+		else if (((d_x[mid]+d_y[mid]+d_z[mid])%numHashPerThread)>hashvalue)
 			return binarySearch(d_x,d_y,d_z,begin,mid-1,hashvalue);
 		else
 			return binarySearch(d_x,d_y,d_z,mid+1, offset,hashvalue);
 	}
+	return -1;
 
 
 
 }
 
-__device__ shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
+__device__ void shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
 {
 	int index=blockIdx.x*blockDim.x+threadIdx.x;
 	int x,y,z;
@@ -176,16 +177,17 @@ __device__ shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
 }
 
 
-__global__ setIndexOrder(int *d_indexOrder, int count)
+__global__ void setIndexOrder(int *d_indexOrder, int count)
 {
 	int index=blockIdx.x*blockDim.x+threadIdx.x;
+	int i;
 	for(i=index*((count+numKernels-1)/numKernels);i<(index+1)*((count+numKernels-1)/numKernels);i++)
 		if(i<count)
 			d_indexOrder[i]=i;
 }
 
 
-__global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
+__global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
 {
 	int begin, last,i,j,sortPos,x,y,z,numberOfLabels, indexOrder,index, front, rear;
 	
@@ -205,7 +207,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
-		indexzOrder=d_indexOrder[i];
+		indexOrder=d_indexOrder[i];
 		for(j=i-1;j-numThreadsPerBlock>=sortPos;j=j-numThreadsPerBlock)
 		{
 			shiftPos<<<1,numThreadsPerBlock>>>(d_x,d_y,d_z,j);
