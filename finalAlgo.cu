@@ -7,7 +7,7 @@
 #define numThreadsPerBlock 32
 
 
-__device__ void swapTriplets(int *d_x,int *d_y,int *d_z,int d_indexOrder, int index1,int index2)
+__device__ void swapTriplets(int *d_x,int *d_y,int *d_z,int *d_indexOrder, int index1,int index2)
 {
 	int temp1,temp2,temp3;
 	int temp4;
@@ -67,7 +67,7 @@ __global__ void createPartition(int count,int *d_x,int *d_y,int *d_z,int *d_inde
 
 		}
 	}
-	_syncthreads();
+	__syncthreads();
 	if((begin>=0) && (last>=0))
 	{
 		if(begin<last)
@@ -168,7 +168,7 @@ __device__ shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
 	y=d_y[offset-index];
 	z=d_z[offset-index];
 	indexOrder=d_indexOrder[offset-index];
-	_syncthreads();
+	__syncthreads();
 	d_x[offset-index+1]=x;
 	d_y[offset-index+1]=y;
 	d_z[offset-index+1]=z;
@@ -250,7 +250,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 
 
 
-	_syncthreads();
+	__syncthreads();
 
 	for(i=0;i<count;i++)
 	{
@@ -264,7 +264,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 				d_queue[d_rear[0]]=i;
 			}
 	
-	}
+		}
 
 		while(d_front[0]!=-1 || rear>front)
 		{
@@ -315,7 +315,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 					}
 				}
 			}
-			_syncthreads();
+			__syncthreads();
 			if(partitionIndex==0)
 			{
 				for(k=0;k<6;k++)
@@ -328,7 +328,7 @@ __global__ sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_part
 				}
 				d_front[0]++;
 			}
-			_syncthreads();
+			__syncthreads();
 		}
 	}
 
