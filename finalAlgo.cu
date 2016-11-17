@@ -187,18 +187,10 @@ __device__ int binarySearch(int *d_x, int *d_y, int *d_z,int begin, int offset,i
 
 __device__ void shiftPos(int *d_x, int *d_y, int *d_z,int *d_indexOrder, int offset)
 {
-	int index=blockIdx.x*blockDim.x+threadIdx.x;
-	int x,y,z;
-	int indexOrder;
-	x=d_x[offset-index];
-	y=d_y[offset-index];
-	z=d_z[offset-index];
-	indexOrder=d_indexOrder[offset-index];
-	__syncthreads();
-	d_x[offset-index+1]=x;
-	d_y[offset-index+1]=y;
-	d_z[offset-index+1]=z;
-	d_indexOrder[offset-index+1]=indexOrder;
+	d_x[offset+1]=d_x[offset];
+	d_y[offset+1]=d_y[offset];
+	d_z[offset+1]=d_z[offset];
+	d_indexOrder[offset+1]=d_indexOrder[offset];
 }
 
 
@@ -216,38 +208,37 @@ __global__ void setIndexOrder(int *d_indexOrder, int count)
 }
 
 
-__global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int d_numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
+
+__global__ void sortBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int *d_numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
 {
 	int partitionIndex;
-//	int front , rear,i,j, sortPos,x,y,z,indexOrder,begin,last;
-//	int hashvalue, tempHashValue;
-	//dx[6],dy[6],dz[6],k;
-//	__shared__ int hashGlobalMemory[hashTableWidth];
+	int front , rear,i,j, sortPos,x,y,z,indexOrder,begin,last;
+	int hashvalue, tempHashValue;
+	int dx[6],dy[6],dz[6],k;
+	__shared__ int hashGlobalMemory[hashTableWidth];
 	partitionIndex=blockIdx.x*blockDim.x+threadIdx.x;
-	if(partitionIndex>=d_numPartitions)
+	if(partitionIndex>=d_numPartitions[0])
 		return;
-//	__shared__ int hashGlobalMemory[hashTableWidth];
 
-//	begin=d_partition_begin[partitionIndex];
-//	last=d_partition_last[partitionIndex];
-/*	for(i=begin;i<=last;i++)
+	begin=d_partition_begin[partitionIndex];
+	last=d_partition_last[partitionIndex];
+	for(i=begin+1;i<=last;i++)
 	{
 		hashvalue=(d_x[i]+d_y[i]+d_z[i])%numHashPerThread;
+		
+printf("Going for binary search %d\n",i);
 		sortPos=binarySearch(d_x,d_y, d_z,begin,(i-1),hashvalue);
 if(sortPos<0)
 {
 printf("sortPos is %d\n",sortPos);
 return ;
 }
+printf("sortPos is %d\n", sortPos);
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
 		indexOrder=d_indexOrder[i];
-		for(j=i-1;j-numThreadsPerBlock>=sortPos;j=j-numThreadsPerBlock)
-		{
-			shiftPos(d_x,d_y,d_z,d_indexOrder,j);
-		}
-		for(;j>=sortPos;j--)
+		for(j=i-1;j>=sortPos;j--)
 		{
 			shiftPos(d_x,d_y,d_z,d_indexOrder,j);
 		}
@@ -270,7 +261,7 @@ return ;
 		if(tempHashValue!=hashvalue)
 		{
 			hashGlobalMemory[partitionIndex*numHashPerThread+tempHashValue]=i;
-			hashvalue=i;
+			hashvalue=tempHashValue;
 		}
 
 	}
@@ -285,13 +276,12 @@ return ;
 		d_numGroups[0]=0;
 	}
 
-
+for(i=partitionIndex*numHashPerThread;i<(partitionIndex+1)*numHashPerThread;i++)
+if(hashGlobalMemory[i]>=0)
+printf("hash %d x= %d %d %d %d\n",i,hashGlobalMemory[i],d_x[hashGlobalMemory[i]],d_y[hashGlobalMemory[i]],d_z[hashGlobalMemory[i]]);
 
 	__syncthreads();
-for(i=0;i<24;i++)
-printf("%d\n",hashGlobalMemory[i]);
-*/
-/*
+
 	for(i=0;i<count;i++)
 	{
 		if(partitionIndex==0)
@@ -371,7 +361,7 @@ printf("%d\n",hashGlobalMemory[i]);
 			__syncthreads();
 		}
 	}
-*/
+
 }
 
 
@@ -470,13 +460,14 @@ int main(int argc, char **argv)
 //viewPartitionTable<<<1,1>>>(d_partition_begin,d_partition_last);
 
 	countPartitions<<<1,1>>>(d_partition_begin,d_partition_last,d_numPartitions);
+//sortAndBFS<<<1,5>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,d_numPartitions,count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
 //viewPartitionTable<<<1,1>>>(d_partition_begin,d_partition_last);
 	cudaMemcpy(h_numPartitions,d_numPartitions,sizeof(int),cudaMemcpyDeviceToHost);
 //printf("numPartitions: %d\n",h_numPartitions[0]);
 
-//	sortAndBFS<<<1,5>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,h_numPartitions[0],count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
-viewCoordinates<<<1,5>>>(d_x,d_y,d_z,d_indexOrder,count);
-/*
+	sortBFS<<<1,h_numPartitions[0]>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,d_numPartitions,count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
+viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
+
 	cudaMemcpy(h_labels,d_labels,count*sizeof(int),cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_numGroups,d_numGroups,sizeof(int),cudaMemcpyDeviceToHost);
 	orderedGroups=(int*)malloc(sizeof(int)*(h_numGroups[0]+1));
@@ -489,7 +480,7 @@ viewCoordinates<<<1,5>>>(d_x,d_y,d_z,d_indexOrder,count);
 		groupLabelJockey++;
 		orderedGroups[h_labels[i]]=groupLabelJockey;
 	}
-	*/
+	
 	ofp=fopen("result.txt","w");
 	for(i=0;i<count;i++)
 		fprintf(ofp,"%d\n",orderedGroups[h_labels[i]]);
