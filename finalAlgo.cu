@@ -218,22 +218,27 @@ __global__ void setIndexOrder(int *d_indexOrder, int count)
 
 __global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_partition_begin, int *d_partition_last,int d_numPartitions, int count, int *d_labels,int *d_queue,int *d_front,int *d_rear,int *d_numGroups, int *d_neighbours)
 {
-	int begin, last,i,j,sortPos,x,y,z, indexOrder, front, rear,partitionIndex;
-	
-	int hashvalue, tempHashValue;
+	int partitionIndex;
+//	int front , rear,i,j, sortPos,x,y,z,indexOrder,begin,last;
+//	int hashvalue, tempHashValue;
 	//dx[6],dy[6],dz[6],k;
-	__shared__ int hashGlobalMemory[hashTableWidth];
+//	__shared__ int hashGlobalMemory[hashTableWidth];
 	partitionIndex=blockIdx.x*blockDim.x+threadIdx.x;
 	if(partitionIndex>=d_numPartitions)
 		return;
 //	__shared__ int hashGlobalMemory[hashTableWidth];
 
-	begin=d_partition_begin[partitionIndex];
-	last=d_partition_last[partitionIndex];
-	for(i=begin;i<=last;i++)
+//	begin=d_partition_begin[partitionIndex];
+//	last=d_partition_last[partitionIndex];
+/*	for(i=begin;i<=last;i++)
 	{
 		hashvalue=(d_x[i]+d_y[i]+d_z[i])%numHashPerThread;
 		sortPos=binarySearch(d_x,d_y, d_z,begin,(i-1),hashvalue);
+if(sortPos<0)
+{
+printf("sortPos is %d\n",sortPos);
+return ;
+}
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
@@ -285,6 +290,7 @@ __global__ void sortAndBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d
 	__syncthreads();
 for(i=0;i<24;i++)
 printf("%d\n",hashGlobalMemory[i]);
+*/
 /*
 	for(i=0;i<count;i++)
 	{
@@ -468,8 +474,8 @@ int main(int argc, char **argv)
 	cudaMemcpy(h_numPartitions,d_numPartitions,sizeof(int),cudaMemcpyDeviceToHost);
 //printf("numPartitions: %d\n",h_numPartitions[0]);
 
-	sortAndBFS<<<1,h_numPartitions[0]>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,h_numPartitions[0],count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
-viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
+//	sortAndBFS<<<1,5>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,h_numPartitions[0],count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
+viewCoordinates<<<1,5>>>(d_x,d_y,d_z,d_indexOrder,count);
 /*
 	cudaMemcpy(h_labels,d_labels,count*sizeof(int),cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_numGroups,d_numGroups,sizeof(int),cudaMemcpyDeviceToHost);
