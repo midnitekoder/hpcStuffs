@@ -219,7 +219,7 @@ __global__ void sortBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_pa
 	partitionIndex=blockIdx.x*blockDim.x+threadIdx.x;
 	if(partitionIndex>=d_numPartitions[0])
 		return;
-
+	printf("partitionIndex= %d\n",partitionIndex);
 	begin=d_partition_begin[partitionIndex];
 	last=d_partition_last[partitionIndex];
 	for(i=begin+1;i<=last;i++)
@@ -256,7 +256,7 @@ printf("sortPos is %d hash=%d x=%d %d %d  ,old %d  %d %d\n", sortPos,hashvalue,d
 
 	for(i=begin;i<=last;i++)
 	{
-		d_labels[i]=-1;
+		d_labels[d_indexOrder[i]]=-1;
 		tempHashValue=(d_x[i]+d_y[i]+d_z[i])%numHashPerThread;
 		if(tempHashValue!=hashvalue)
 		{
@@ -271,9 +271,12 @@ printf("sortPos is %d hash=%d x=%d %d %d  ,old %d  %d %d\n", sortPos,hashvalue,d
 
 	if(partitionIndex==0)
 	{
+//		printf("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
 		d_front[0]=-1;
 		d_rear[0]=-1;
 		d_numGroups[0]=0;
+		for(i=0;i<count;i++)
+		printf("label %d\n",d_labels[i]); 
 	}
 
 for(i=partitionIndex*numHashPerThread;i<(partitionIndex+1)*numHashPerThread;i++)
@@ -288,15 +291,18 @@ printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory
 		{
 			if(d_labels[d_indexOrder[i]]==-1)
 			{
+//				printf("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n");
 				d_front[0]=0;
 				d_rear[0]=0;
 				d_numGroups[0]++;
+				d_labels[d_indexOrder[i]]=d_numGroups[0];
 				d_queue[d_rear[0]]=i;
+
 			}
 	
 		}
 
-		while(d_front[0]!=-1 || rear>front)
+		while(d_front[0]!=-1 && rear>=front)
 		{
 			front=d_front[0];
 			rear=d_rear[0];
@@ -323,7 +329,7 @@ printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory
 
 			for(j=0;j<6;j++)
 			{
-				if((compare(dx[j],dy[j],dz[j],d_x[d_partition_begin[partitionIndex]],d_y[d_partition_begin[partitionIndex]],d_z[d_partition_begin[partitionIndex]])>=0)&&(compare(dx[j],dy[j],dz[j],d_x[d_partition_begin[partitionIndex]],d_y[d_partition_begin[partitionIndex]],d_z[d_partition_begin[partitionIndex]])<=0))
+				if((compare(dx[j],dy[j],dz[j],d_x[d_partition_begin[partitionIndex]],d_y[d_partition_begin[partitionIndex]],d_z[d_partition_begin[partitionIndex]])>=0)&&(compare(dx[j],dy[j],dz[j],d_x[d_partition_last[partitionIndex]],d_y[d_partition_last[partitionIndex]],d_z[d_partition_last[partitionIndex]])<=0))
 				{
 					if(hashGlobalMemory[partitionIndex*numHashPerThread+((dx[j]+dy[j]+dz[j])%numHashPerThread)]!=-1)
 					{
@@ -348,6 +354,7 @@ printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory
 			__syncthreads();
 			if(partitionIndex==0)
 			{
+// printf("ccccccccccccccccccccccccccccccccccccccccccc\n");
 				for(k=0;k<6;k++)
 				{
 					if(d_neighbours[k]!=-1)
@@ -361,7 +368,11 @@ printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory
 			__syncthreads();
 		}
 	}
-
+if(partitionIndex==0)
+{
+for(i=0;i<count;i++)
+	printf("abfs output %d %d %d %d\n", d_x[i],d_y[i],d_z[i],d_labels[i]);
+}
 }
 
 
@@ -384,17 +395,18 @@ int main(int argc, char **argv)
 {
 	int count,i,*d_front,*d_rear,*h_labels,*d_labels,*h_partition_begin,*d_partition_begin, *orderedGroups;
 	int *h_partition_last,*d_partition_last,*d_queue,*h_numGroups, *d_numGroups,*d_indexOrder,*d_neighbours;
-	int nx,ny,nz,x,y,z,*h_x,*h_y,*h_z,*d_x,*d_y,*d_z,*h_numPartitions,*d_numPartitions,groupLabelJockey;
+	int x,y,z,*h_x,*h_y,*h_z,*d_x,*d_y,*d_z,*h_numPartitions,*d_numPartitions,groupLabelJockey;
 	FILE *fp, *ofp;
 	
 	fp=fopen(argv[1],"r");
 	printf("argv %s", argv[1]);
 	count=0;
-	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
-	printf("%d %d %d\n",nx,ny,nz);
+//	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
+//	printf("%d %d %d\n",nx,ny,nz);
 	while(feof(fp)==0)
 	{
-		fscanf(fp,"%d %d %d\n",&x,&y,&z);
+//		fscanf(fp,"%d %d %d\n",&x,&y,&z);
+		fscanf(fp,"%d,%d,%d\n",&x,&y,&z);
 		printf("%d %d %d\n",x,y,z);
 		count++;
 	}
@@ -426,10 +438,11 @@ int main(int argc, char **argv)
 
 
 	fp=fopen(argv[1],"r");
-	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
-	printf("%d %d %d\n",nx,ny,nz);
+//	fscanf(fp,"Nx=%d Ny=%d Nz=%d",&nx,&ny,&nz);
+//	printf("%d %d %d\n",nx,ny,nz);
 	for(i=0;i<count;i++)
-	fscanf(fp,"%d %d %d\n",&h_x[i],&h_y[i],&h_z[i]);
+//	fscanf(fp,"%d %d %d\n",&h_x[i],&h_y[i],&h_z[i]);
+	fscanf(fp,"%d,%d,%d\n",&h_x[i],&h_y[i],&h_z[i]);
 	
 	fclose(fp);
 
@@ -484,7 +497,7 @@ viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
 		orderedGroups[h_labels[i]]=groupLabelJockey;
 	}
 	
-	ofp=fopen("result.txt","w");
+	ofp=fopen("result1.txt","w");
 	for(i=0;i<count;i++)
 		fprintf(ofp,"%d\n",orderedGroups[h_labels[i]]);
 	fclose(ofp);

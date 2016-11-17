@@ -1,0 +1,1 @@
+nvcc finalAlgo.cu
