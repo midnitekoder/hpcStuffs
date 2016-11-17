@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include <sys/time.h>
 
 #define numKernels 512
 #define hashTableWidth 12288
@@ -219,21 +220,21 @@ __global__ void sortBFS(int *d_x,int *d_y, int *d_z,int *d_indexOrder, int *d_pa
 	partitionIndex=blockIdx.x*blockDim.x+threadIdx.x;
 	if(partitionIndex>=d_numPartitions[0])
 		return;
-	printf("partitionIndex= %d\n",partitionIndex);
+//	printf("partitionIndex= %d\n",partitionIndex);
 	begin=d_partition_begin[partitionIndex];
 	last=d_partition_last[partitionIndex];
 	for(i=begin+1;i<=last;i++)
 	{
 		hashvalue=(d_x[i]+d_y[i]+d_z[i])%numHashPerThread;
 		
-printf("Going for binary search %d\n",i);
+//printf("Going for binary search %d\n",i);
 		sortPos=binarySearch(d_x,d_y, d_z,begin,(i-1),hashvalue);
 if(sortPos<0)
 {
 printf("sortPos is %d\n",sortPos);
 return ;
 }
-printf("sortPos is %d hash=%d x=%d %d %d  ,old %d  %d %d\n", sortPos,hashvalue,d_x[sortPos],d_y[sortPos],d_z[sortPos],d_x[i],d_y[i],d_z[i]);
+// printf("sortPos is %d hash=%d x=%d %d %d  ,old %d  %d %d\n", sortPos,hashvalue,d_x[sortPos],d_y[sortPos],d_z[sortPos],d_x[i],d_y[i],d_z[i]);
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
@@ -275,14 +276,16 @@ printf("sortPos is %d hash=%d x=%d %d %d  ,old %d  %d %d\n", sortPos,hashvalue,d
 		d_front[0]=-1;
 		d_rear[0]=-1;
 		d_numGroups[0]=0;
-		for(i=0;i<count;i++)
+/*		for(i=0;i<count;i++)
 		printf("label %d\n",d_labels[i]); 
+*/
 	}
+/*
 
 for(i=partitionIndex*numHashPerThread;i<(partitionIndex+1)*numHashPerThread;i++)
 if(hashGlobalMemory[i]>=0)
 printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory[i],d_x[hashGlobalMemory[i]],d_y[hashGlobalMemory[i]],d_z[hashGlobalMemory[i]]);
-
+*/
 	__syncthreads();
 
 	for(i=0;i<count;i++)
@@ -368,11 +371,13 @@ printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory
 			__syncthreads();
 		}
 	}
+/*
 if(partitionIndex==0)
 {
 for(i=0;i<count;i++)
 	printf("abfs output %d %d %d %d\n", d_x[i],d_y[i],d_z[i],d_labels[i]);
 }
+*/
 }
 
 
@@ -397,7 +402,9 @@ int main(int argc, char **argv)
 	int *h_partition_last,*d_partition_last,*d_queue,*h_numGroups, *d_numGroups,*d_indexOrder,*d_neighbours;
 	int x,y,z,*h_x,*h_y,*h_z,*d_x,*d_y,*d_z,*h_numPartitions,*d_numPartitions,groupLabelJockey;
 	FILE *fp, *ofp;
-	
+	timeval t1, t2;
+    double elapsedTime;
+gettimeofday(&t1, NULL);
 	fp=fopen(argv[1],"r");
 	printf("argv %s", argv[1]);
 	count=0;
@@ -407,7 +414,7 @@ int main(int argc, char **argv)
 	{
 //		fscanf(fp,"%d %d %d\n",&x,&y,&z);
 		fscanf(fp,"%d,%d,%d\n",&x,&y,&z);
-		printf("%d %d %d\n",x,y,z);
+//		printf("%d %d %d\n",x,y,z);
 		count++;
 	}
 	printf("%d\n",count);
@@ -479,16 +486,16 @@ int main(int argc, char **argv)
 //printf("numPartitions: %d\n",h_numPartitions[0]);
 
 	sortBFS<<<1,h_numPartitions[0]>>>(d_x,d_y,d_z,d_indexOrder,d_partition_begin,d_partition_last,d_numPartitions,count,d_labels,d_queue,d_front,d_rear,d_numGroups,d_neighbours);
-viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
+// viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
 
 	cudaMemcpy(h_labels,d_labels,count*sizeof(int),cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_numGroups,d_numGroups,sizeof(int),cudaMemcpyDeviceToHost);
 	orderedGroups=(int*)malloc(sizeof(int)*(h_numGroups[0]+1));
 	for(i=1;i<=h_numGroups[0];i++)
 		orderedGroups[i]=-1;
-	for(i=0;i<count;i++)
+/*	for(i=0;i<count;i++)
 	printf("bfs output %d %d %d %d\n", h_x[i],h_y[i],h_z[i],h_labels[i]);
-
+*/
 	groupLabelJockey=0;
 	for(i=0;i<count;i++)
 	if(orderedGroups[h_labels[i]]==-1)
@@ -497,7 +504,7 @@ viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
 		orderedGroups[h_labels[i]]=groupLabelJockey;
 	}
 	
-	ofp=fopen("result1.txt","w");
+	ofp=fopen("result.csv","w");
 	for(i=0;i<count;i++)
 		fprintf(ofp,"%d\n",orderedGroups[h_labels[i]]);
 	fclose(ofp);
@@ -521,6 +528,8 @@ viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
 	cudaFree(d_numGroups);
 	cudaFree(d_indexOrder);
 	cudaFree(d_neighbours);
-	
+	gettimeofday(&t2, NULL);
+	elapsedTime = (t2.tv_sec - t1.tv_sec);
+	printf("Time elapsed: %lf seconds\n",elapsedTime);
 	return 0;
 }
