@@ -233,7 +233,7 @@ if(sortPos<0)
 printf("sortPos is %d\n",sortPos);
 return ;
 }
-printf("sortPos is %d\n", sortPos);
+printf("sortPos is %d hash=%d x=%d %d %d  ,old %d  %d %d\n", sortPos,hashvalue,d_x[sortPos],d_y[sortPos],d_z[sortPos],d_x[i],d_y[i],d_z[i]);
 		x=d_x[i];
 		y=d_y[i];
 		z=d_z[i];
@@ -278,7 +278,7 @@ printf("sortPos is %d\n", sortPos);
 
 for(i=partitionIndex*numHashPerThread;i<(partitionIndex+1)*numHashPerThread;i++)
 if(hashGlobalMemory[i]>=0)
-printf("hash %d x= %d %d %d %d\n",i,hashGlobalMemory[i],d_x[hashGlobalMemory[i]],d_y[hashGlobalMemory[i]],d_z[hashGlobalMemory[i]]);
+printf("partition=%d hash %d x= %d %d %d %d\n",partitionIndex,i,hashGlobalMemory[i],d_x[hashGlobalMemory[i]],d_y[hashGlobalMemory[i]],d_z[hashGlobalMemory[i]]);
 
 	__syncthreads();
 
@@ -473,6 +473,9 @@ viewCoordinates<<<1,1>>>(d_x,d_y,d_z,d_indexOrder,count);
 	orderedGroups=(int*)malloc(sizeof(int)*(h_numGroups[0]+1));
 	for(i=1;i<=h_numGroups[0];i++)
 		orderedGroups[i]=-1;
+	for(i=0;i<count;i++)
+	printf("bfs output %d %d %d %d\n", h_x[i],h_y[i],h_z[i],h_labels[i]);
+
 	groupLabelJockey=0;
 	for(i=0;i<count;i++)
 	if(orderedGroups[h_labels[i]]==-1)
